@@ -25,7 +25,6 @@ use iced::{
                 math::Angle,
             },
         },
-        container::{Catalog, Style},
     },
     window,
 };

@@ -18,6 +18,3 @@ shared_types = { path = "../shared_types" }
 
 [build-dependencies]
 cxx-build = "1"
-
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-Ctarget-feature=+crt-static"]
