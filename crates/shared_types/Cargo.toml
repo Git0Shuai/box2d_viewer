@@ -1,0 +1,9 @@
+[package]
+name = "shared_types"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = { workspace = true }
+bitcode = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"]}

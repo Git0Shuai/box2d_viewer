@@ -1,0 +1,23 @@
+[package]
+name = "box2d_reporter"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+cxx = { version = "1.0.157" }
+
+tokio ={ workspace = true, features = ["rt", "sync"]}
+tokio-util ={ workspace = true, features = ["codec"]}
+async-io = {workspace = true}
+uds_windows = {workspace = true}
+
+shared_types = { path = "../shared_types" }
+
+[build-dependencies]
+cxx-build = "1"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]

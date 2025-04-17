@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.dependencies]
+log = "0.4"
+thiserror = "2"
+bitcode = "0.6"
+tokio = "1"
+tokio-util = "0.7"
+async-io = "2"
+uds_windows = "1"

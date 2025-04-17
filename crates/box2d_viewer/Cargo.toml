@@ -1,0 +1,18 @@
+[package]
+name = "box2d_viewer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+env_logger = "0.11"
+anyhow = "1"
+iced = { version = "0.13", features = ["canvas"] }
+
+log = {workspace = true}
+futures-lite = "2"
+async-io = {workspace = true}
+uds_windows = {workspace = true}
+tokio = { workspace = true, features = ["rt"] }
+tokio-util = { workspace = true, features = ["codec", "compat"] }
+
+shared_types = { path = "../shared_types"}
