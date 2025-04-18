@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 env_logger = "0.11"
 anyhow = "1"
-iced = { version = "0.13", features = ["canvas"] }
+iced = { version = "0.13", features = ["canvas", "tokio", "advanced"] }
 
 log = {workspace = true}
 futures-lite = "2"

@@ -8,6 +8,7 @@ use async_io::Async;
 use futures_lite::{FutureExt, StreamExt};
 use iced::{
     Element, Event, Length, Point, Rectangle, Renderer, Size, Subscription, Theme, Vector,
+    advanced::mouse::Click,
     futures::{
         SinkExt,
         channel::{
@@ -55,9 +56,11 @@ struct Box2dCanvasProg {
     name: String,
     shapes: Option<Vec<Shape>>,
     cache: canvas::Cache,
+    active: bool,
 }
 
 struct CanvasState {
+    pub left_click: Option<Click>,
     pub drag: bool,
     pub drag_cursor_last_pos: Option<iced::Point>,
     pub scale: f32,
@@ -67,6 +70,7 @@ struct CanvasState {
 impl Default for CanvasState {
     fn default() -> Self {
         CanvasState {
+            left_click: None,
             drag: false,
             scale: 1_f32,
             drag_cursor_last_pos: None,
@@ -82,11 +86,11 @@ impl canvas::Program<Message> for Box2dCanvasProg {
         &self,
         state: &mut Self::State,
         event: canvas::Event,
-        _bounds: Rectangle,
+        bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<Message>) {
         let captured = canvas::event::Status::Captured;
-        let redarw = Message::Redraw((self.id, self.name.clone()));
+        let redraw = Message::Redraw((self.id, self.name.clone()));
 
         match event {
             canvas::Event::Mouse(mouse_evt) => {
@@ -97,12 +101,76 @@ impl canvas::Program<Message> for Box2dCanvasProg {
                             mouse::ScrollDelta::Lines { y, .. } => y,
                             mouse::ScrollDelta::Pixels { y, .. } => y,
                         };
-                        state.scale = (state.scale * f32::powf(1.1, delta)).max(0.01).min(100.);
-                        return (captured, Some(redarw));
+                        let prev_scale = state.scale;
+                        state.scale = (prev_scale * f32::powf(1.1, delta)).max(0.01).min(100.);
+                        if let Some(pos) = cursor.position() {
+                            // before: p_world * prev_scale + prev_offset = p_screen
+                            // after:  p_world * state.scale + state.offset = p_screen
+                            let p_screen = Vector::new(pos.x, pos.y);
+                            state.offset = p_screen
+                                - (p_screen - state.offset) * (1. / prev_scale) * state.scale
+                        }
+                        return (captured, Some(redraw));
                     }
                     mouse::Event::ButtonPressed(mouse::Button::Right) => {
                         state.drag = true;
                         state.drag_cursor_last_pos = cursor.position();
+                        return (captured, None);
+                    }
+                    mouse::Event::ButtonPressed(mouse::Button::Left) => {
+                        if let Some(pos) = cursor.position() {
+                            let click = Click::new(pos, mouse::Button::Left, state.left_click);
+                            if let iced::advanced::mouse::click::Kind::Double = click.kind() {
+                                state.left_click = None;
+                                if let Some(ref shapes) = self.shapes {
+                                    let all_shapes_aabb: Option<(f32, f32, f32, f32)> =
+                                        shapes.iter().fold(None, |acc, it| {
+                                            let shape_aabb = match it {
+                                                Shape::Circle(circle_shape) => (
+                                                    circle_shape.pos.0 - circle_shape.radius,
+                                                    circle_shape.pos.1 - circle_shape.radius,
+                                                    circle_shape.pos.0 + circle_shape.radius,
+                                                    circle_shape.pos.1 + circle_shape.radius,
+                                                ),
+                                                Shape::Rect(rect_shape) => (
+                                                    rect_shape.top_left.0,
+                                                    rect_shape.top_left.1 - rect_shape.size.1,
+                                                    rect_shape.top_left.0 + rect_shape.size.0,
+                                                    rect_shape.top_left.1,
+                                                ),
+                                            };
+                                            if let Some(acc) = acc {
+                                                Some((
+                                                    acc.0.min(shape_aabb.0),
+                                                    acc.1.min(shape_aabb.1),
+                                                    acc.2.max(shape_aabb.2),
+                                                    acc.3.max(shape_aabb.3),
+                                                ))
+                                            } else {
+                                                Some(shape_aabb)
+                                            }
+                                        });
+                                    if let Some(all_shapes_aabb) = all_shapes_aabb {
+                                        let size = Size::new(
+                                            all_shapes_aabb.2 - all_shapes_aabb.0,
+                                            all_shapes_aabb.3 - all_shapes_aabb.1,
+                                        );
+                                        state.scale = (bounds.width / size.width)
+                                            .min(bounds.height / size.height)
+                                            .min(100.)
+                                            .max(0.01);
+                                        let center = Point::new(
+                                            (all_shapes_aabb.0 + all_shapes_aabb.2) / 2.,
+                                            -(all_shapes_aabb.1 + all_shapes_aabb.3) / 2.,
+                                        ) * iced::Transformation::scale(state.scale);
+                                        state.offset = bounds.center() - center;
+                                        return (captured, Some(redraw));
+                                    }
+                                };
+                            } else {
+                                state.left_click = Some(click)
+                            }
+                        }
                         return (captured, None);
                     }
                     mouse::Event::CursorMoved { position } => {
@@ -111,7 +179,7 @@ impl canvas::Program<Message> for Box2dCanvasProg {
                                 state.offset = state.offset + (position - last_pos);
                             }
                             state.drag_cursor_last_pos = Some(position);
-                            return (captured, Some(redarw));
+                            return (captured, Some(redraw));
                         }
                     }
                     mouse::Event::ButtonReleased(mouse::Button::Right) => {
@@ -188,6 +256,7 @@ enum Message {
     CloseConn(i32),
     Event(Event),
     Redraw((i32, String)),
+    CheckActive,
 }
 
 fn update(state: &mut State, msg: Message) {
@@ -201,6 +270,7 @@ fn update(state: &mut State, msg: Message) {
             val.name = msg.name;
             val.shapes.replace(msg.shapes);
             val.cache.clear();
+            val.active = true;
         }
         Message::CloseConn(id) => {
             state.canvases.retain(|key, _| key.0 == id);
@@ -214,6 +284,13 @@ fn update(state: &mut State, msg: Message) {
             }
         }
         Message::Event(_) => {}
+        Message::CheckActive => {
+            state.canvases.retain(|_, val| val.active);
+            state
+                .canvases
+                .iter_mut()
+                .for_each(|(_, val)| val.active = false);
+        }
     }
 }
 
@@ -269,8 +346,9 @@ fn subscription(_state: &State) -> Subscription<Message> {
     });
 
     let events = iced::event::listen().map(Message::Event);
+    let tick = iced::time::every(iced::time::Duration::from_secs(2)).map(|_| Message::CheckActive);
 
-    Subscription::batch([net, events])
+    Subscription::batch([net, events, tick])
 }
 
 async fn handle_conn(id: i32, stream: UnixStream, mut tx: Sender<Message>) -> anyhow::Result<()> {
