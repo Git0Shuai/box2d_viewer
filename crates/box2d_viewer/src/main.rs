@@ -252,8 +252,8 @@ impl canvas::Program<Message> for Box2dCanvasProg {
                         )
                     }
                     &Shape::Segment(SegmentShape { p1, p2 }) => {
-                        let p1 = Point { x: p1.0, y: -p1.1 };
-                        let p2 = Point { x: p2.0, y: -p2.1 };
+                        let p1 = Point::ORIGIN + Vector::new(p1.0, -p1.1) * scale + offset;
+                        let p2 = Point::ORIGIN + Vector::new(p2.0, -p2.1) * scale + offset;
                         frame.stroke(&Path::line(p1, p2), Stroke::default())
                     }
                 }

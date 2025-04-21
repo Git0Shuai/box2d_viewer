@@ -65,8 +65,12 @@ pub struct ShapeCodec {
 
 impl ShapeCodec {
     pub fn new() -> Self {
+        let len_delimited_codec = LengthDelimitedCodec::builder()
+            .max_frame_length(32 * 1_024 * 1_024)
+            .new_codec();
+
         ShapeCodec {
-            len_delimited_codec: LengthDelimitedCodec::new(),
+            len_delimited_codec,
             bitcode_buffer: bitcode::Buffer::new(),
         }
     }
