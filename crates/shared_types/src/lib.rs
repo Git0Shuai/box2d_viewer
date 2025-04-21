@@ -16,6 +16,7 @@ pub struct DrawMessage {
 pub enum Shape {
     Circle(CircleShape),
     Rect(RectShape),
+    Segment(SegmentShape),
 }
 
 #[derive(Debug, Encode, Decode)]
@@ -29,6 +30,12 @@ pub struct RectShape {
     pub top_left: (f32, f32),
     pub size: (f32, f32),
     pub rotate: f32,
+}
+
+#[derive(Debug, Encode, Decode)]
+pub struct SegmentShape {
+    pub p1: (f32, f32),
+    pub p2: (f32, f32),
 }
 
 #[derive(Debug, thiserror::Error)]

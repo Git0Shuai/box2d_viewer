@@ -9,16 +9,22 @@ use std::{
 use tokio::sync::mpsc::{Sender, channel};
 use tokio_util::{bytes::BytesMut, codec::Encoder};
 
-use shared_types::{CircleShape, DrawMessage, RectShape, Shape, ShapeCodec};
+use shared_types::{CircleShape, DrawMessage, RectShape, SegmentShape, Shape, ShapeCodec};
 
 #[cxx::bridge(namespace = "rs::box2d_viewer")]
 mod ffi {
     extern "Rust" {
-        pub fn draw_remote(sock: &str, name: &str, circles: &[f32], rects: &[f32]);
+        pub fn draw_remote(
+            sock: &str,
+            name: &str,
+            circles: &[f32],
+            rects: &[f32],
+            segments: &[f32],
+        );
     }
 }
 
-pub fn draw_remote(sock: &str, name: &str, circles: &[f32], rects: &[f32]) {
+pub fn draw_remote(sock: &str, name: &str, circles: &[f32], rects: &[f32], segments: &[f32]) {
     thread_local! {
         static ENCODER: RefCell<ShapeCodec> = RefCell::new(ShapeCodec::new());
     }
@@ -76,11 +82,17 @@ pub fn draw_remote(sock: &str, name: &str, circles: &[f32], rects: &[f32]) {
                 rotate: it[4],
             })
         });
+        let segments = segments.chunks_exact(4).map(|it| {
+            Shape::Segment(SegmentShape {
+                p1: (it[0], it[1]),
+                p2: (it[2], it[3]),
+            })
+        });
 
         if tx.try_reserve().is_ok() {
             let msg = DrawMessage {
                 name: name.to_owned(),
-                shapes: circles.chain(rects).collect(),
+                shapes: circles.chain(rects).chain(segments).collect(),
             };
 
             let mut data = BytesMut::new();

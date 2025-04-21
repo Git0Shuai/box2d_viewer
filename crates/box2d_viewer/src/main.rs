@@ -29,7 +29,7 @@ use iced::{
     },
     window,
 };
-use shared_types::{CircleShape, DrawMessage, RectShape, Shape, ShapeCodec};
+use shared_types::{CircleShape, DrawMessage, RectShape, SegmentShape, Shape, ShapeCodec};
 use tokio_util::{codec::FramedRead, compat::FuturesAsyncReadCompatExt};
 use uds::UnixListener;
 use uds::UnixStream;
@@ -138,6 +138,24 @@ impl canvas::Program<Message> for Box2dCanvasProg {
                                                     rect_shape.top_left.0 + rect_shape.size.0,
                                                     rect_shape.top_left.1,
                                                 ),
+                                                Shape::Segment(segment_shape) => (
+                                                    f32::min(
+                                                        segment_shape.p1.0,
+                                                        segment_shape.p2.0,
+                                                    ),
+                                                    f32::min(
+                                                        segment_shape.p1.1,
+                                                        segment_shape.p2.1,
+                                                    ),
+                                                    f32::max(
+                                                        segment_shape.p1.0,
+                                                        segment_shape.p2.0,
+                                                    ),
+                                                    f32::max(
+                                                        segment_shape.p1.1,
+                                                        segment_shape.p2.1,
+                                                    ),
+                                                ),
                                             };
                                             if let Some(acc) = acc {
                                                 Some((
@@ -232,6 +250,11 @@ impl canvas::Program<Message> for Box2dCanvasProg {
                             &Path::rectangle(Point::ORIGIN, rect).transform(&transform),
                             Stroke::default(),
                         )
+                    }
+                    &Shape::Segment(SegmentShape { p1, p2 }) => {
+                        let p1 = Point { x: p1.0, y: -p1.1 };
+                        let p2 = Point { x: p2.0, y: -p2.1 };
+                        frame.stroke(&Path::line(p1, p2), Stroke::default())
                     }
                 }
             }
